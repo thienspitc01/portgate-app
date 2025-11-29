@@ -1,0 +1,7 @@
+{
+  "name": "PortGate QR",
+  "description": "Ứng dụng chuyển đổi số xe đầu kéo và mooc thành mã QR giúp nhân viên cảng quét và nhập liệu nhanh chóng.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

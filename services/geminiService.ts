@@ -1,16 +1,8 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const getClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key not found in environment variables");
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
 /**
- * Resizes and compresses an image to improve reliability and speed on mobile devices.
+ * Tối ưu hóa hình ảnh (giảm kích thước và nén) để hoạt động ổn định trên mạng di động.
  */
 export const optimizeImage = (file: File, maxWidth = 1024, maxHeight = 1024): Promise<{ data: string, mimeType: string }> => {
   return new Promise((resolve, reject) => {
@@ -24,7 +16,6 @@ export const optimizeImage = (file: File, maxWidth = 1024, maxHeight = 1024): Pr
         let width = img.width;
         let height = img.height;
 
-        // Calculate new dimensions maintaining aspect ratio
         if (width > height) {
           if (width > maxWidth) {
             height *= maxWidth / width;
@@ -40,51 +31,46 @@ export const optimizeImage = (file: File, maxWidth = 1024, maxHeight = 1024): Pr
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error("Could not get canvas context"));
+        if (!ctx) return reject(new Error("Không thể khởi tạo canvas"));
         
         ctx.drawImage(img, 0, 0, width, height);
-        
-        // Export as JPEG with 70% quality to significantly reduce payload size
+        // Nén JPEG 70% giúp giảm dung lượng cực lớn từ camera điện thoại
         const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         const base64 = dataUrl.split(',')[1];
         resolve({ data: base64, mimeType: 'image/jpeg' });
       };
-      img.onerror = () => reject(new Error("Failed to load image for resizing"));
+      img.onerror = () => reject(new Error("Lỗi tải ảnh"));
     };
-    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onerror = () => reject(new Error("Lỗi đọc file"));
   });
 };
 
 /**
- * Extracts license plate number from an optimized image using Gemini.
+ * Trích xuất biển số xe bằng Gemini 3 Flash.
  */
 export const extractLicensePlate = async (base64Data: string, mimeType: string): Promise<string> => {
+  // Kiểm tra API Key ngay tại thời điểm gọi
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+    throw new Error("API_KEY_MISSING: Chưa cấu hình API Key trên Vercel.");
+  }
+
   try {
-    const ai = getClient();
-    
-    // Using gemini-3-flash-preview for the best multimodal performance (OCR)
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
         parts: [
-          {
-            inlineData: {
-              data: base64Data,
-              mimeType: mimeType,
-            },
-          },
-          {
-            text: "Extract the vehicle license plate number from this image. Return ONLY the alphanumeric characters (uppercase) with no spaces, dashes, or special characters. If multiple plates are visible, return the most prominent one. If no plate is found, return empty string.",
-          },
+          { inlineData: { data: base64Data, mimeType } },
+          { text: "Extract the vehicle license plate number. Return ONLY the alphanumeric characters (uppercase) with no spaces. If no plate found, return empty." }
         ],
       },
     });
 
     const text = response.text?.trim() || "";
-    // Post-processing to ensure clean output
     return text.replace(/[^A-Z0-9]/g, '');
-  } catch (error) {
-    console.error("Gemini OCR Error:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("Gemini Error:", error);
+    throw new Error(error.message || "Lỗi xử lý AI");
   }
 };

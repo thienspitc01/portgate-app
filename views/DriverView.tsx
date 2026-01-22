@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import QRCode from "react-qr-code";
 import { PlateData } from '../types';
@@ -10,35 +11,22 @@ const STORAGE_KEY = 'portgate_last_plate_data';
 export const DriverView: React.FC = () => {
   const [data, setData] = useState<PlateData>({ truck: '', mooc: '' });
   
-  // Load last used data on mount
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         setData(JSON.parse(saved));
       } catch (e) {
-        console.error("Failed to load saved data");
+        console.error("Load data failed");
       }
     }
   }, []);
 
-  // Save to local storage whenever data changes
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
 
-  const handleTruckOCR = (text: string) => {
-    setData(prev => ({ ...prev, truck: text }));
-  };
-
-  const handleMoocOCR = (text: string) => {
-    setData(prev => ({ ...prev, mooc: text }));
-  };
-
-  // Generate a simple pipe-delimited string for the QR code to keep it small and fast to scan
-  // Format: T:NUMBER|M:NUMBER
   const qrValue = `T:${data.truck.toUpperCase().trim()}|M:${data.mooc.toUpperCase().trim()}`;
-  
   const hasData = data.truck || data.mooc;
 
   return (
@@ -54,17 +42,18 @@ export const DriverView: React.FC = () => {
             label="Biển số Đầu Kéo"
             placeholder="VD: 51C12345"
             value={data.truck}
+            icon={<Truck className="w-5 h-5" />}
             onChange={(e) => setData({ ...data, truck: e.target.value.toUpperCase() })}
-            rightElement={<OCRCapture onScanComplete={handleTruckOCR} label="Chụp đầu kéo" />}
+            rightElement={<OCRCapture onScanComplete={(txt) => setData(p => ({...p, truck: txt}))} />}
           />
           
           <Input
             label="Biển số Rơ Mooc"
             placeholder="VD: 51R99999"
             value={data.mooc}
-            onChange={(e) => setData({ ...data, mooc: e.target.value.toUpperCase() })}
-            rightElement={<OCRCapture onScanComplete={handleMoocOCR} label="Chụp rơ mooc" />}
             icon={<Container className="w-5 h-5" />}
+            onChange={(e) => setData({ ...data, mooc: e.target.value.toUpperCase() })}
+            rightElement={<OCRCapture onScanComplete={(txt) => setData(p => ({...p, mooc: txt}))} />}
           />
         </div>
       </div>
@@ -86,10 +75,6 @@ export const DriverView: React.FC = () => {
             <p>Nhập thông tin xe để tạo mã QR</p>
           </div>
         )}
-        
-        <p className="mt-6 text-sm text-gray-500 text-center max-w-xs">
-          Đưa mã này cho nhân viên cổng cảng để quét thông tin tự động.
-        </p>
       </div>
     </div>
   );

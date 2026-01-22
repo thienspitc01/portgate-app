@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { Camera, Loader2, AlertCircle } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
 import { extractLicensePlate, optimizeImage } from '../services/geminiService';
 import { Button } from './ui/Button';
 
@@ -22,19 +22,16 @@ export const OCRCapture: React.FC<OCRCaptureProps> = ({ onScanComplete, label = 
       const optimized = await optimizeImage(file);
       const extractedText = await extractLicensePlate(optimized.data, optimized.mimeType);
       
-      if (extractedText) {
+      if (extractedText && extractedText.length > 3) {
         onScanComplete(extractedText);
       } else {
-        alert("Không nhận diện được biển số. Hãy chụp gần và rõ hơn.");
+        alert("⚠️ Không nhận diện được biển số.\n\nMẹo: Hãy chụp gần hơn, giữ thẳng camera và đảm bảo đủ ánh sáng.");
       }
     } catch (error: any) {
-      console.error("OCR Error:", error);
-      
-      if (error.message?.includes("API_KEY_MISSING")) {
-        alert("⚠️ THIẾU CẤU HÌNH:\nBạn cần vào Vercel Dashboard -> Settings -> Environment Variables và thêm biến 'API_KEY' với mã Gemini của bạn, sau đó Redeploy.");
-      } else {
-        alert(`Lỗi: ${error.message || "Không thể kết nối máy chủ AI"}`);
-      }
+      console.error("OCR Process Error:", error);
+      // Guidelines state that the app must not prompt users for API keys. 
+      // Assuming availability of API_KEY is handled by the deployment environment.
+      alert(`❌ Lỗi kết nối AI: ${error.message || "Vui lòng thử lại sau"}`);
     } finally {
       setIsProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -56,12 +53,12 @@ export const OCRCapture: React.FC<OCRCaptureProps> = ({ onScanComplete, label = 
         variant="secondary" 
         onClick={() => fileInputRef.current?.click()}
         isLoading={isProcessing}
-        className="!p-2 aspect-square rounded-lg relative"
+        className="!p-3 aspect-square rounded-xl shadow-sm border-blue-100 hover:border-blue-300 transition-all"
       >
         {isProcessing ? (
-          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+          <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
         ) : (
-          <Camera className="w-5 h-5 text-gray-600" />
+          <Camera className="w-6 h-6 text-blue-500" />
         )}
       </Button>
     </>

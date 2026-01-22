@@ -2,7 +2,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Tối ưu hóa hình ảnh (giảm kích thước và nén) để hoạt động ổn định trên mạng di động.
+ * Nén và tối ưu ảnh để giảm băng thông (quan trọng cho 4G yếu tại cảng)
  */
 export const optimizeImage = (file: File, maxWidth = 1024, maxHeight = 1024): Promise<{ data: string, mimeType: string }> => {
   return new Promise((resolve, reject) => {
@@ -31,46 +31,42 @@ export const optimizeImage = (file: File, maxWidth = 1024, maxHeight = 1024): Pr
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error("Không thể khởi tạo canvas"));
+        if (!ctx) return reject(new Error("Canvas context failed"));
         
         ctx.drawImage(img, 0, 0, width, height);
-        // Nén JPEG 70% giúp giảm dung lượng cực lớn từ camera điện thoại
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
         const base64 = dataUrl.split(',')[1];
         resolve({ data: base64, mimeType: 'image/jpeg' });
       };
-      img.onerror = () => reject(new Error("Lỗi tải ảnh"));
+      img.onerror = () => reject(new Error("Image load failed"));
     };
-    reader.onerror = () => reject(new Error("Lỗi đọc file"));
+    reader.onerror = () => reject(new Error("File read failed"));
   });
 };
 
 /**
- * Trích xuất biển số xe bằng Gemini 3 Flash.
+ * Trích xuất biển số xe bằng Gemini 3 Flash với prompt tối ưu cho Việt Nam
  */
 export const extractLicensePlate = async (base64Data: string, mimeType: string): Promise<string> => {
-  // Kiểm tra API Key ngay tại thời điểm gọi
-  const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
-    throw new Error("API_KEY_MISSING: Chưa cấu hình API Key trên Vercel.");
-  }
+  // Always initialize with apiKey from process.env.API_KEY right before the call.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
         parts: [
           { inlineData: { data: base64Data, mimeType } },
-          { text: "Extract the vehicle license plate number. Return ONLY the alphanumeric characters (uppercase) with no spaces. If no plate found, return empty." }
+          { text: "Phân tích hình ảnh biển số xe Việt Nam này. Trích xuất số biển số xe (ví dụ: 51C12345, 51R01234, 15H00123). Loại bỏ tất cả dấu chấm, dấu gạch ngang và khoảng cách. Chỉ trả về chuỗi ký tự chữ và số viết hoa. Nếu không thấy biển số rõ ràng, trả về chuỗi rỗng." }
         ],
       },
     });
 
-    const text = response.text?.trim() || "";
-    return text.replace(/[^A-Z0-9]/g, '');
+    // Access .text property directly as per guidelines.
+    const result = response.text?.trim() || "";
+    return result.replace(/[^A-Z0-9]/g, '');
   } catch (error: any) {
-    console.error("Gemini Error:", error);
-    throw new Error(error.message || "Lỗi xử lý AI");
+    console.error("Gemini API Error:", error);
+    throw error;
   }
 };
